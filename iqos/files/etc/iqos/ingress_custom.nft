@@ -1,0 +1,19 @@
+# ====================================================================
+# iqos - 入口方向（下载）内联规则
+# ====================================================================
+# 用途: 嵌入到 filter_qos_ingress 链中，位于 UCI 规则之后、ACK 限速之前
+#       用于补充或覆盖 UCI 规则，实现基于连接状态、字节数、包大小等复杂分类。
+# 语法: 只包含 nftables 语句，不能出现 table、chain 等顶层关键字。
+#       规则会自动插入到主链中，注意执行顺序：UCI 规则 -> 本文件规则 -> ACK 限速
+# 生效: 修改后需重启服务: /etc/init.d/iqos restart 
+# 调试: 查看规则是否生效: nft list chain inet iqos-priority filter_qos_ingress
+# ====================================================================
+
+# 1. 新建连接（SYN）标记为实时（适合游戏、VoIP 的新建连接）
+#meta mark 0 tcp flags syn meta nfproto { ipv4, ipv6 } meta mark set 0x00010000 counter
+
+# 2. 已建立的 UDP 大流量（> 500KB）降级为 bulk
+#meta mark 0 meta l4proto udp ct state established ct bytes > 512000 meta nfproto { ipv4, ipv6 } meta mark set 0x00080000 counter
+
+# 3. 小包（< 256 字节）提升为实时（适合心跳、确认包）
+#meta mark 0 meta length < 256 meta nfproto { ipv4, ipv6 } meta mark set 0x00010000 counter

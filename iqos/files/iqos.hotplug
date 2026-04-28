@@ -1,0 +1,24 @@
+#!/bin/sh
+
+logger -t "qos_hotplug" "事件: INTERFACE=$INTERFACE, ACTION=$ACTION"
+
+case "$INTERFACE" in
+    wan|pppoe-wan)
+        logger -t "qos_hotplug" "处理 $INTERFACE 接口事件"
+        ;;
+    *)
+        # 不是 wan 接口，忽略
+        exit 0
+        ;;
+esac
+
+case "$ACTION" in
+    ifup)
+        logger -t "qos_hotplug" "启动 QoS"
+        /etc/init.d/iqos start
+        ;;
+    ifdown)
+        logger -t "qos_hotplug" "停止 QoS"
+        /etc/init.d/iqos stop
+        ;;
+esac

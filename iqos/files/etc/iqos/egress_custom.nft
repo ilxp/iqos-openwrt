@@ -1,0 +1,19 @@
+# ====================================================================
+# iqos - 出口方向（上传）内联规则
+# ====================================================================
+# 用途: 嵌入到 filter_qos_egress 链中，位于 UCI 规则之后、ACK 限速之前
+#       用于补充或覆盖 UCI 规则，实现基于连接状态、字节数、包大小等复杂分类。
+# 语法: 只包含 nftables 语句，不能出现 table、chain 等顶层关键字。
+#       规则会自动插入到主链中，注意执行顺序：UCI 规则 -> 本文件规则 -> ACK 限速
+# 生效: 修改后需重启服务: /etc/init.d/iqos restart 
+# 调试: 查看规则是否生效: nft list chain inet iqos-priority filter_qos_egress
+# ====================================================================
+
+# 1. SYN-ACK（响应新建连接）标记为实时，加速握手
+#meta mark 0 tcp flags syn,ack meta nfproto { ipv4, ipv6 } meta mark set 0x00000001 counter
+
+# 2. 已建立的 TCP 小流量（< 50KB）保持普通，不降级
+#meta mark 0 meta l4proto tcp ct state established ct bytes < 51200 meta nfproto { ipv4, ipv6 } meta mark set 0x00000004 counter
+
+# 3. UDP 大包（> 1400 字节）且非 DNS 端口，标记为 bulk（适合文件传输类）
+#meta mark 0 meta l4proto udp udp length > 1400 th dport != 53 meta nfproto { ipv4, ipv6 } meta mark set 0x00000008 counter

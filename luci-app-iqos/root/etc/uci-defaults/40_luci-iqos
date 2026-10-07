@@ -1,0 +1,16 @@
+#!/bin/sh
+# Copyright 2026 ilxp <lixp@live.com>
+# Licensed to the public under the Apache License 2.0.
+
+uci -q batch <<-EOF >/dev/null
+	delete ucitrack.@iqos[-1]
+	add ucitrack iqos
+	set ucitrack.@iqos[-1].init=iqos
+	commit ucitrack
+EOF
+
+/etc/init.d/iqos stop
+/etc/init.d/iqos disable
+
+rm -rf /tmp/luci-modulecache /tmp/luci-indexcache
+exit 0

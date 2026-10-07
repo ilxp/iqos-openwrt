@@ -1,0 +1,39 @@
+#!/bin/sh
+# Combined hotplug: IFB setup + iQoS lifecycle.
+# Order matters: ifb0 must exist before iQoS starts.
+
+# 只关心 WAN 相关接口
+case "$INTERFACE" in
+    wan|wan_6|pppoe-wan) ;;
+    *) exit 0 ;;
+esac
+
+logger -t "qos_hotplug" "事件: INTERFACE=$INTERFACE, ACTION=$ACTION"
+
+case "$ACTION" in
+    ifup|ifupdate)
+        # 1. 先确保 ifb0 存在并同步 MTU / qlen
+        [ -x /etc/init.d/ifb ] && /etc/init.d/ifb start
+
+        # 2. iQoS 只在 IPv4 WAN 接口 up 时启动一次
+        case "$INTERFACE" in
+            wan|pppoe-wan)
+                if [ "$ACTION" = "ifup" ] && [ -x /etc/init.d/iqos ]; then
+                    logger -t "qos_hotplug" "启动 QoS"
+                    /etc/init.d/iqos start
+                fi
+                ;;
+        esac
+        ;;
+    ifdown)
+        # ifb0 不删除；只有 iQoS 需要停
+        case "$INTERFACE" in
+            wan|pppoe-wan)
+                if [ -x /etc/init.d/iqos ]; then
+                    logger -t "qos_hotplug" "停止 QoS"
+                    /etc/init.d/iqos stop
+                fi
+                ;;
+        esac
+        ;;
+esac

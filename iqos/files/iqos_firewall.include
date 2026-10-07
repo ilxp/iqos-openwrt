@@ -1,0 +1,4 @@
+#!/bin/sh
+# iqos_firewall_addition for firewall4
+. /etc/init.d/iqos
+start

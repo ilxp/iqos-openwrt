@@ -1,0 +1,48 @@
+#!/bin/sh /etc/rc.common
+# IFB device manager: create ifb0, sync MTU and queue length.
+# Invoked at boot and by hotplug on WAN events. Idempotent.
+
+START=21
+STOP=99
+
+ifb_setup() {
+    # 加载内核模块
+    lsmod | grep -q "^ifb " || modprobe ifb 2>/dev/null
+
+    # 创建 ifb0（若不存在），处理竞态
+    if [ ! -e /sys/class/net/ifb0 ]; then
+        ip link add ifb0 type ifb 2>/dev/null
+        [ -e /sys/class/net/ifb0 ] || return 1
+    fi
+
+    ip link set dev ifb0 up 2>/dev/null
+
+    # 同步 MTU：优先 pppoe-wan，回退 wan
+    local src=""
+    if [ -f /sys/class/net/pppoe-wan/mtu ]; then
+        src="/sys/class/net/pppoe-wan/mtu"
+    elif [ -f /sys/class/net/wan/mtu ]; then
+        src="/sys/class/net/wan/mtu"
+    fi
+    if [ -n "$src" ]; then
+        local mtu
+        mtu=$(cat "$src" 2>/dev/null)
+        [ -n "$mtu" ] && [ "$mtu" -gt 0 ] 2>/dev/null && \
+            ip link set dev ifb0 mtu "$mtu" 2>/dev/null
+    fi
+
+    # 同步队列长度
+    [ -f /sys/class/net/ifb0/tx_queue_len ] && \
+        echo 1000 > /sys/class/net/ifb0/tx_queue_len 2>/dev/null
+
+    return 0
+}
+
+start() {
+    ifb_setup || true
+}
+
+stop() {
+    echo "stopping ifb service..."
+    # ifb0 保留不删除。
+}
